@@ -14,7 +14,18 @@ if (!fs.existsSync(uploadsDir)) {
 }
 
 // Middleware
-app.use(cors());
+// CORS configuration for production domain
+const corsOptions = {
+  origin: [
+    'http://my-test.co.ke',
+    'http://www.my-test.co.ke',
+    'http://localhost:9090',
+    'http://localhost:3002'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use('/uploads', express.static(uploadsDir));
 
