@@ -1,0 +1,21 @@
+# Dependencies
+node_modules
+npm-debug.log
+yarn-error.log
+
+# Development
+.env.local
+.env.development
+
+# IDE
+.vscode
+.idea
+
+# OS files
+.DS_Store
+
+# Git
+.git
+
+# Uploads (will use volumes)
+uploads/*

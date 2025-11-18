@@ -1,0 +1,42 @@
+services:
+  # Backend service (Express API)
+  backend:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: shoe-store-backend
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    environment:
+      - NODE_ENV=production
+      - PORT=5001
+    volumes:
+      # Persist uploaded images
+      - uploads:/app/server/uploads
+    networks:
+      - shoe-store-network
+
+  # Frontend service (React + nginx)
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: shoe-store-frontend
+    restart: unless-stopped
+    ports:
+      - "9090:80"
+    depends_on:
+      - backend
+    networks:
+      - shoe-store-network
+
+# Named volumes for data persistence
+volumes:
+  uploads:
+    driver: local
+
+# Network for service communication
+networks:
+  shoe-store-network:
+    driver: bridge
