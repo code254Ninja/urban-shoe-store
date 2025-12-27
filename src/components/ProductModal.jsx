@@ -1,19 +1,46 @@
-import { useState } from 'react';
-import { X, Star, Heart, ShoppingCart } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { X, Star, Heart, ShoppingCart, Scale } from 'lucide-react';
 import { useCart } from '../hooks/useCart.jsx';
+import { useToast } from '../hooks/useToast.jsx';
+import { useWishlist } from '../hooks/useWishlist.jsx';
+import { useCompare } from '../hooks/useCompare.jsx';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed.jsx';
 
 const ProductModal = ({ product, isOpen, onClose }) => {
   const [selectedSize, setSelectedSize] = useState(product?.sizes?.[0] || '');
   const [selectedColor, setSelectedColor] = useState(product?.colors?.[0] || '');
   const [quantity, setQuantity] = useState(1);
-  const [isLiked, setIsLiked] = useState(false);
   const { addToCart } = useCart();
+  const { notify } = useToast();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+  const { compareIds, toggleCompare, maxCompare } = useCompare();
+  const { trackView } = useRecentlyViewed();
+
+  const liked = product ? isWishlisted(product.id) : false;
+  const compareDisabled = product ? (!compareIds.includes(product.id) && compareIds.length >= maxCompare) : false;
+
+  useEffect(() => {
+    if (!product || !isOpen) return;
+    setSelectedSize(product?.sizes?.[0] || '');
+    setSelectedColor(product?.colors?.[0] || '');
+    setQuantity(1);
+  }, [product?.id, isOpen]);
+
+  useEffect(() => {
+    if (!product || !isOpen) return;
+    trackView(product.id);
+  }, [product?.id, isOpen, trackView]);
 
   if (!isOpen || !product) return null;
 
   const handleAddToCart = () => {
     if (selectedSize && selectedColor) {
       addToCart(product, selectedSize, selectedColor, quantity);
+      notify({
+        variant: 'success',
+        title: 'Added to cart',
+        message: `${product.name} • ${selectedSize} • ${selectedColor} ×${quantity}`,
+      });
       onClose();
     }
   };
@@ -85,9 +112,9 @@ const ProductModal = ({ product, isOpen, onClose }) => {
 
                 {/* Price */}
                 <div className="flex items-center space-x-3 mb-4">
-                  <span className="text-3xl font-bold text-gray-900">${product.price}</span>
+                  <span className="text-3xl font-bold text-gray-900">KES {product.price.toLocaleString()}</span>
                   {product.originalPrice > product.price && (
-                    <span className="text-xl text-gray-500 line-through">${product.originalPrice}</span>
+                    <span className="text-xl text-gray-500 line-through">KES {product.originalPrice.toLocaleString()}</span>
                   )}
                 </div>
 
@@ -187,16 +214,51 @@ const ProductModal = ({ product, isOpen, onClose }) => {
                   <ShoppingCart className="w-5 h-5" />
                   <span>Add to Cart</span>
                 </button>
+
+                <button
+                  onClick={() => {
+                    if (compareDisabled) {
+                      notify({
+                        variant: 'info',
+                        title: 'Compare limit reached',
+                        message: `You can compare up to ${maxCompare} shoes`,
+                      });
+                      return;
+                    }
+                    toggleCompare(product.id);
+                    const isInCompare = compareIds.includes(product.id);
+                    notify({
+                      variant: 'info',
+                      title: isInCompare ? 'Removed from compare' : 'Added to compare',
+                      message: product.name,
+                    });
+                  }}
+                  disabled={compareDisabled}
+                  className={`p-3 rounded-lg border transition-colors ${
+                    compareDisabled ? 'border-gray-200 text-gray-300 cursor-not-allowed' : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                  title="Compare"
+                >
+                  <Scale className="w-5 h-5" />
+                </button>
                 
                 <button
-                  onClick={() => setIsLiked(!isLiked)}
+                  onClick={() => {
+                    const next = !liked;
+                    toggleWishlist(product.id);
+                    notify({
+                      variant: 'info',
+                      title: next ? 'Saved' : 'Removed',
+                      message: next ? 'Added to wishlist' : 'Removed from wishlist',
+                    });
+                  }}
                   className={`p-3 rounded-lg border transition-colors ${
-                    isLiked 
+                    liked 
                       ? 'bg-red-50 border-red-200 text-red-600' 
                       : 'border-gray-300 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
-                  <Heart className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} />
+                  <Heart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
                 </button>
               </div>
             </div>

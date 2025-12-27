@@ -1,21 +1,43 @@
+import { useEffect, useState } from 'react';
 import { X, Plus, Minus, ShoppingBag } from 'lucide-react';
 import { useCart } from '../hooks/useCart.jsx';
+import { useToast } from '../hooks/useToast.jsx';
 
 const CartSidebar = ({ isOpen, onClose }) => {
   const { items, updateQuantity, removeFromCart, getCartTotal, clearCart } = useCart();
+  const { notify } = useToast();
+  const [isMounted, setIsMounted] = useState(isOpen);
+  const [isVisible, setIsVisible] = useState(isOpen);
 
-  if (!isOpen) return null;
+  useEffect(() => {
+    if (isOpen) {
+      setIsMounted(true);
+      const t = setTimeout(() => setIsVisible(true), 10);
+      return () => clearTimeout(t);
+    }
+    setIsVisible(false);
+    const t = setTimeout(() => setIsMounted(false), 220);
+    return () => clearTimeout(t);
+  }, [isOpen]);
+
+  if (!isMounted) return null;
 
   return (
     <>
       {/* Overlay */}
       <div 
-        className="fixed inset-0 bg-black bg-opacity-50 z-50"
+        className={`fixed inset-0 bg-black z-50 transition-opacity duration-200 ${
+          isVisible ? 'bg-opacity-50' : 'bg-opacity-0'
+        }`}
         onClick={onClose}
       />
       
       {/* Sidebar */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-300">
+      <div
+        className={`fixed right-0 top-0 h-full w-full max-w-md bg-white shadow-xl z-50 transform transition-transform duration-200 ${
+          isVisible ? 'translate-x-0' : 'translate-x-full'
+        }`}
+      >
         <div className="flex flex-col h-full">
           {/* Header */}
           <div className="flex items-center justify-between p-4 border-b border-gray-200">
@@ -60,7 +82,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
                         <span>•</span>
                         <span>Color: {item.color}</span>
                       </div>
-                      <p className="font-semibold text-gray-900">${item.price}</p>
+                      <p className="font-semibold text-gray-900">KES {item.price.toLocaleString()}</p>
                     </div>
 
                     <div className="flex flex-col items-end space-y-2">
@@ -83,7 +105,14 @@ const CartSidebar = ({ isOpen, onClose }) => {
 
                       {/* Remove Button */}
                       <button
-                        onClick={() => removeFromCart(item.id, item.size, item.color)}
+                        onClick={() => {
+                          removeFromCart(item.id, item.size, item.color);
+                          notify({
+                            variant: 'info',
+                            title: 'Removed',
+                            message: `${item.name} • ${item.size} • ${item.color}`,
+                          });
+                        }}
                         className="text-red-500 hover:text-red-700 text-sm"
                       >
                         Remove
@@ -101,7 +130,7 @@ const CartSidebar = ({ isOpen, onClose }) => {
               {/* Total */}
               <div className="flex items-center justify-between text-lg font-semibold">
                 <span>Total:</span>
-                <span>${getCartTotal().toFixed(2)}</span>
+                <span>KES {getCartTotal().toLocaleString()}</span>
               </div>
 
               {/* Action Buttons */}
@@ -110,7 +139,14 @@ const CartSidebar = ({ isOpen, onClose }) => {
                   Checkout
                 </button>
                 <button
-                  onClick={clearCart}
+                  onClick={() => {
+                    clearCart();
+                    notify({
+                      variant: 'info',
+                      title: 'Cart cleared',
+                      message: 'Your cart is now empty',
+                    });
+                  }}
                   className="w-full btn-secondary"
                 >
                   Clear Cart

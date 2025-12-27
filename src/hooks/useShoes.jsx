@@ -1,33 +1,85 @@
-import { useState, useEffect } from 'react';
-import { shoes as initialShoes } from '../data/shoes';
+import { useState, useEffect, useCallback } from 'react';
+
+const API_URL = '/api';
 
 export const useShoes = () => {
   const [shoes, setShoes] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
-  useEffect(() => {
-    // Load shoes from localStorage or start with empty array
-    const storedShoes = localStorage.getItem('shoes');
-    if (storedShoes) {
-      try {
-        setShoes(JSON.parse(storedShoes));
-      } catch (error) {
-        console.error('Error parsing stored shoes:', error);
-        setShoes([]);
-        localStorage.setItem('shoes', JSON.stringify([]));
+  const fetchShoes = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      const response = await fetch(`${API_URL}/shoes`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch shoes');
       }
-    } else {
-      // Start with empty catalog - shoes will be added through admin panel
-      setShoes([]);
-      localStorage.setItem('shoes', JSON.stringify([]));
+      const data = await response.json();
+      setShoes(data.shoes || []);
+    } catch (err) {
+      console.error('Error fetching shoes:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
   }, []);
 
+  useEffect(() => {
+    fetchShoes();
+  }, [fetchShoes]);
+
   const refreshShoes = () => {
-    const storedShoes = localStorage.getItem('shoes');
-    if (storedShoes) {
-      setShoes(JSON.parse(storedShoes));
+    fetchShoes();
+  };
+
+  const addShoe = async (shoeData) => {
+    try {
+      const response = await fetch(`${API_URL}/shoes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shoeData),
+      });
+      if (!response.ok) throw new Error('Failed to add shoe');
+      const data = await response.json();
+      await fetchShoes();
+      return data;
+    } catch (err) {
+      console.error('Error adding shoe:', err);
+      throw err;
     }
   };
 
-  return { shoes, refreshShoes };
+  const updateShoe = async (id, shoeData) => {
+    try {
+      const response = await fetch(`${API_URL}/shoes/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(shoeData),
+      });
+      if (!response.ok) throw new Error('Failed to update shoe');
+      const data = await response.json();
+      await fetchShoes();
+      return data;
+    } catch (err) {
+      console.error('Error updating shoe:', err);
+      throw err;
+    }
+  };
+
+  const deleteShoe = async (id) => {
+    try {
+      const response = await fetch(`${API_URL}/shoes/${id}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to delete shoe');
+      await fetchShoes();
+      return true;
+    } catch (err) {
+      console.error('Error deleting shoe:', err);
+      throw err;
+    }
+  };
+
+  return { shoes, loading, error, refreshShoes, addShoe, updateShoe, deleteShoe };
 };

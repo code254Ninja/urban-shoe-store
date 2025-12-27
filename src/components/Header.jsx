@@ -2,11 +2,13 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, Menu, X, Heart, User, Shield } from 'lucide-react';
 import { useCart } from '../hooks/useCart.jsx';
+import { useWishlist } from '../hooks/useWishlist.jsx';
 
 const Header = ({ onCartClick, onSearchChange }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { getCartItemsCount } = useCart();
+  const { wishlistIds } = useWishlist();
   const navigate = useNavigate();
 
   const handleSearchChange = (e) => {
@@ -64,8 +66,17 @@ const Header = ({ onCartClick, onSearchChange }) => {
             </button>
 
             {/* Wishlist */}
-            <button className="p-2 text-gray-700 hover:text-primary-600 relative">
+            <button
+              onClick={() => navigate('/wishlist')}
+              className="p-2 text-gray-700 hover:text-primary-600 relative"
+              title="Wishlist"
+            >
               <Heart className="w-6 h-6" />
+              {wishlistIds.length > 0 && (
+                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                  {wishlistIds.length}
+                </span>
+              )}
             </button>
 
             {/* Account */}

@@ -1,16 +1,29 @@
-import { useState } from 'react';
-import { Heart, Star, Plus } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { Heart, Star, Plus, Scale } from 'lucide-react';
 import { useCart } from '../hooks/useCart.jsx';
+import { useToast } from '../hooks/useToast.jsx';
+import { useWishlist } from '../hooks/useWishlist.jsx';
+import { useCompare } from '../hooks/useCompare.jsx';
 
-const ProductCard = ({ product, onQuickView }) => {
-  const [isLiked, setIsLiked] = useState(false);
+const ProductCard = ({ product, onQuickView, animationDelayMs = 0, compact = false }) => {
   const [selectedSize, setSelectedSize] = useState(product.sizes[0]);
   const [selectedColor, setSelectedColor] = useState(product.colors[0]);
   const { addToCart } = useCart();
+  const { notify } = useToast();
+  const { isWishlisted, toggleWishlist } = useWishlist();
+  const { compareIds, toggleCompare, maxCompare } = useCompare();
+
+  const liked = isWishlisted(product.id);
+  const compareDisabled = useMemo(() => !compareIds.includes(product.id) && compareIds.length >= maxCompare, [compareIds, maxCompare, product.id]);
 
   const handleAddToCart = (e) => {
     e.stopPropagation();
     addToCart(product, selectedSize, selectedColor);
+    notify({
+      variant: 'success',
+      title: 'Added to cart',
+      message: `${product.name} • ${selectedSize} • ${selectedColor}`,
+    });
   };
 
   const handleQuickView = () => {
@@ -22,12 +35,16 @@ const ProductCard = ({ product, onQuickView }) => {
     : 0;
 
   return (
-    <div className="card group cursor-pointer transition-transform duration-200 hover:scale-105" onClick={handleQuickView}>
+    <div
+      className="card group cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md animate-fade-up"
+      onClick={handleQuickView}
+      style={{ animationDelay: `${animationDelayMs}ms` }}
+    >
       <div className="relative overflow-hidden">
         <img
           src={product.image}
           alt={product.name}
-          className="w-full h-64 object-cover transition-transform duration-300 group-hover:scale-110"
+          className={`w-full object-cover transition-transform duration-300 group-hover:scale-110 ${compact ? 'h-32' : 'h-64'}`}
         />
         
         {/* Discount Badge */}
@@ -41,22 +58,57 @@ const ProductCard = ({ product, onQuickView }) => {
         <button
           onClick={(e) => {
             e.stopPropagation();
-            setIsLiked(!isLiked);
+            const next = !liked;
+            toggleWishlist(product.id);
+            notify({
+              variant: 'info',
+              title: next ? 'Saved' : 'Removed',
+              message: next ? 'Added to wishlist' : 'Removed from wishlist',
+            });
           }}
           className={`absolute top-3 right-3 p-2 rounded-full transition-colors ${
-            isLiked 
+            liked 
               ? 'bg-red-500 text-white' 
               : 'bg-white text-gray-600 hover:bg-gray-100'
           }`}
         >
-          <Heart className={`w-4 h-4 ${isLiked ? 'fill-current' : ''}`} />
+          <Heart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
+        </button>
+
+        {/* Compare Button */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            if (compareDisabled) {
+              notify({
+                variant: 'info',
+                title: 'Compare limit reached',
+                message: `You can compare up to ${maxCompare} shoes`,
+              });
+              return;
+            }
+            toggleCompare(product.id);
+            const isInCompare = compareIds.includes(product.id);
+            notify({
+              variant: 'info',
+              title: isInCompare ? 'Removed from compare' : 'Added to compare',
+              message: product.name,
+            });
+          }}
+          disabled={compareDisabled}
+          className={`absolute top-3 right-14 p-2 rounded-full transition-colors ${
+            compareDisabled ? 'bg-white text-gray-300 cursor-not-allowed' : 'bg-white text-gray-600 hover:bg-gray-100'
+          }`}
+          title="Compare"
+        >
+          <Scale className="w-4 h-4" />
         </button>
 
         {/* Quick Add Button */}
         <div className="absolute bottom-3 left-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
           <button
             onClick={handleAddToCart}
-            className="w-full bg-primary-600 hover:bg-primary-700 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center space-x-2"
+            className="w-full bg-primary-600 hover:bg-primary-700 active:bg-primary-700 text-white py-2 px-4 rounded-lg font-medium flex items-center justify-center space-x-2"
           >
             <Plus className="w-4 h-4" />
             <span>Quick Add</span>
@@ -121,9 +173,9 @@ const ProductCard = ({ product, onQuickView }) => {
 
         {/* Price */}
         <div className="flex items-center space-x-2">
-          <span className="text-lg font-bold text-gray-900">${product.price}</span>
+          <span className="text-lg font-bold text-gray-900">KES {product.price.toLocaleString()}</span>
           {product.originalPrice > product.price && (
-            <span className="text-sm text-gray-500 line-through">${product.originalPrice}</span>
+            <span className="text-sm text-gray-500 line-through">KES {product.originalPrice.toLocaleString()}</span>
           )}
         </div>
       </div>

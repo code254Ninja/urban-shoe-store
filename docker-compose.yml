@@ -1,4 +1,24 @@
 services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: shoe-store-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shoestore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-shoestore123}
+      POSTGRES_DB: ${POSTGRES_DB:-shoestore}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./server/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - shoe-store-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shoestore -d shoestore"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   # Backend service (Express API)
   backend:
     build:
@@ -7,13 +27,16 @@ services:
     container_name: shoe-store-backend
     restart: unless-stopped
     ports:
-      - "5001:5001"
+      - "${BACKEND_PORT:-5001}:5001"
     environment:
       - NODE_ENV=production
       - PORT=5001
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-shoestore}:${POSTGRES_PASSWORD:-shoestore123}@postgres:5432/${POSTGRES_DB:-shoestore}
     volumes:
-      # Persist uploaded images
       - uploads:/app/server/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - shoe-store-network
 
@@ -25,7 +48,7 @@ services:
     container_name: shoe-store-frontend
     restart: unless-stopped
     ports:
-      - "9090:80"
+      - "${NGINX_PORT:-8080}:80"
     depends_on:
       - backend
     networks:
@@ -34,6 +57,8 @@ services:
 # Named volumes for data persistence
 volumes:
   uploads:
+    driver: local
+  postgres_data:
     driver: local
 
 # Network for service communication

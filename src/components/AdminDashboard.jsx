@@ -26,6 +26,7 @@ const AdminDashboard = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
   const [uploadLoading, setUploadLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!isAdmin) {
@@ -35,16 +36,18 @@ const AdminDashboard = () => {
     loadShoes();
   }, [isAdmin, navigate]);
 
-  const loadShoes = () => {
-    const storedShoes = localStorage.getItem('shoes');
-    if (storedShoes) {
-      setShoes(JSON.parse(storedShoes));
+  const loadShoes = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch('/api/shoes');
+      if (!response.ok) throw new Error('Failed to fetch shoes');
+      const data = await response.json();
+      setShoes(data.shoes || []);
+    } catch (error) {
+      console.error('Error loading shoes:', error);
+    } finally {
+      setLoading(false);
     }
-  };
-
-  const saveShoes = (updatedShoes) => {
-    localStorage.setItem('shoes', JSON.stringify(updatedShoes));
-    setShoes(updatedShoes);
   };
 
   const handleInputChange = (e) => {
@@ -119,25 +122,47 @@ const AdminDashboard = () => {
       return;
     }
     
-    const newShoe = {
-      ...formData,
-      image: imageUrl,
-      id: editingId || Date.now(),
+    const shoeData = {
+      name: formData.name,
+      brand: formData.brand,
+      category: formData.category.toLowerCase(),
+      description: formData.description,
       price: parseFloat(formData.price),
-      originalPrice: parseFloat(formData.originalPrice),
-      rating: parseFloat(formData.rating),
-      reviews: parseInt(formData.reviews)
+      originalPrice: parseFloat(formData.originalPrice) || null,
+      image: imageUrl,
+      sizes: formData.sizes.map(s => String(s)),
+      colors: formData.colors,
+      tags: formData.features,
+      rating: parseFloat(formData.rating) || 0,
+      reviews: parseInt(formData.reviews) || 0,
+      stock: 50,
+      featured: false
     };
 
-    let updatedShoes;
-    if (editingId) {
-      updatedShoes = shoes.map(shoe => shoe.id === editingId ? newShoe : shoe);
-    } else {
-      updatedShoes = [...shoes, newShoe];
-    }
+    try {
+      let response;
+      if (editingId) {
+        response = await fetch(`/api/shoes/${editingId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(shoeData)
+        });
+      } else {
+        response = await fetch('/api/shoes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(shoeData)
+        });
+      }
 
-    saveShoes(updatedShoes);
-    resetForm();
+      if (!response.ok) throw new Error('Failed to save shoe');
+      
+      await loadShoes();
+      resetForm();
+    } catch (error) {
+      console.error('Error saving shoe:', error);
+      alert('Failed to save shoe. Please try again.');
+    }
   };
 
   const handleEdit = (shoe) => {
@@ -146,25 +171,33 @@ const AdminDashboard = () => {
       name: shoe.name,
       brand: shoe.brand,
       price: shoe.price.toString(),
-      originalPrice: shoe.originalPrice.toString(),
+      originalPrice: (shoe.originalPrice || '').toString(),
       image: shoe.image,
-      category: shoe.category,
-      sizes: shoe.sizes,
-      colors: shoe.colors,
-      rating: shoe.rating,
-      reviews: shoe.reviews,
-      description: shoe.description,
-      features: shoe.features
+      category: shoe.category ? shoe.category.charAt(0).toUpperCase() + shoe.category.slice(1) : 'Running',
+      sizes: shoe.sizes || [],
+      colors: shoe.colors || [],
+      rating: shoe.rating || 0,
+      reviews: shoe.reviews || 0,
+      description: shoe.description || '',
+      features: shoe.tags || []
     });
     setImagePreview(shoe.image);
     setSelectedFile(null);
     setIsFormOpen(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this shoe?')) {
-      const updatedShoes = shoes.filter(shoe => shoe.id !== id);
-      saveShoes(updatedShoes);
+      try {
+        const response = await fetch(`/api/shoes/${id}`, {
+          method: 'DELETE'
+        });
+        if (!response.ok) throw new Error('Failed to delete shoe');
+        await loadShoes();
+      } catch (error) {
+        console.error('Error deleting shoe:', error);
+        alert('Failed to delete shoe. Please try again.');
+      }
     }
   };
 
@@ -486,7 +519,12 @@ const AdminDashboard = () => {
             </h2>
           </div>
 
-          {shoes.length === 0 ? (
+          {loading ? (
+            <div className="text-center py-12">
+              <div className="w-8 h-8 border-4 border-primary-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-500">Loading shoes from database...</p>
+            </div>
+          ) : shoes.length === 0 ? (
             <div className="text-center py-12">
               <p className="text-gray-500">No shoes added yet. Click "Add New Shoe" to get started.</p>
             </div>
@@ -537,7 +575,7 @@ const AdminDashboard = () => {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">${shoe.price}</div>
+                        <div className="text-sm text-gray-900">KES {shoe.price.toLocaleString()}</div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                         <div className="flex gap-2">
